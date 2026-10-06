@@ -1,0 +1,20 @@
+# Hardened Docker sandbox for executing untrusted repository code and test suites
+FROM python:3.11-slim
+
+# Create a restricted non-root user
+RUN useradd -m -u 1001 -s /bin/bash sandboxuser
+
+# Install pytest and basic testing dependencies
+RUN pip install --no-cache-dir pytest
+
+# Set working directory
+WORKDIR /workspace
+
+# Switch to restricted non-root user
+USER sandboxuser
+
+# Environment safeguards
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+CMD ["pytest", "-v", "--tb=short", "-p", "no:cacheprovider"]

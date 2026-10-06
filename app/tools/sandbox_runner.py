@@ -1,3 +1,4 @@
+import logging
 import os
 import re
 import subprocess
@@ -8,12 +9,27 @@ from typing import List, Optional
 
 from app.models.schemas import TestExecutionResult, TestFailureDetail
 
+logger = logging.getLogger(__name__)
+
 
 class SandboxTestRunner:
-    """Executes repository test suites in a controlled subprocess environment with timeout protection."""
+    """Executes repository test suites with hardened Docker isolation or subprocess fallback."""
 
-    def __init__(self, default_timeout: int = 30):
+    def __init__(self, default_timeout: int = 30, use_docker_if_available: bool = True):
         self.default_timeout = default_timeout
+        self.use_docker_if_available = use_docker_if_available
+
+    def is_docker_available(self) -> bool:
+        """Check if Docker daemon is active and responsive."""
+        if not self.use_docker_if_available:
+            return False
+        try:
+            import docker
+            client = docker.from_env()
+            client.ping()
+            return True
+        except Exception:
+            return False
 
     def run_pytest(
         self,
@@ -21,20 +37,84 @@ class SandboxTestRunner:
         test_target: Optional[str] = None,
         timeout: Optional[int] = None,
     ) -> TestExecutionResult:
-        """Run pytest inside the repo directory and parse structured results."""
+        """Executes test suite inside a hardened Docker container, falling back to secure subprocess."""
         target_dir = Path(repo_path).resolve()
         if not target_dir.is_dir():
             raise FileNotFoundError(f"Target repository directory not found: {target_dir}")
 
         timeout_val = timeout or self.default_timeout
 
+        # 1. Attempt hardened Docker execution if Docker daemon is running
+        if self.is_docker_available():
+            try:
+                return self._run_in_docker(target_dir, test_target, timeout_val)
+            except Exception as e:
+                logger.warning(f"Docker sandbox execution encountered error ({e}); using subprocess fallback.")
+
+        # 2. Subprocess sandbox execution with timeout and environment isolation
+        return self._run_in_subprocess(target_dir, test_target, timeout_val)
+
+    def _run_in_docker(
+        self, target_dir: Path, test_target: Optional[str], timeout_val: int
+    ) -> TestExecutionResult:
+        """Executes pytest inside an isolated container with memory, CPU, and network limits."""
+        import docker
+
+        client = docker.from_env()
+        image_tag = "swe-agent-sandbox:latest"
+
+        # Check or build sandbox image if needed
+        try:
+            client.images.get(image_tag)
+        except docker.errors.ImageNotFound:
+            dockerfile_path = Path(__file__).resolve().parent.parent.parent / "docker"
+            if (dockerfile_path / "Dockerfile.sandbox").is_file():
+                client.images.build(
+                    path=str(dockerfile_path),
+                    dockerfile="Dockerfile.sandbox",
+                    tag=image_tag,
+                )
+            else:
+                image_tag = "python:3.11-slim"
+
+        cmd = "pytest -v --tb=short -p no:cacheprovider"
+        if test_target:
+            cmd += f" {test_target}"
+
+        start_time = time.time()
+        container = client.containers.run(
+            image=image_tag,
+            command=f"bash -c 'pip install pytest -q && {cmd}'",
+            volumes={str(target_dir): {"bind": "/workspace", "mode": "rw"}},
+            working_dir="/workspace",
+            network_mode="none",             # Complete network isolation (no outbound connections)
+            mem_limit="512m",                 # 512MB RAM ceiling
+            nano_cpus=1_000_000_000,          # 1.0 CPU limit
+            detach=True,
+        )
+
+        try:
+            status = container.wait(timeout=timeout_val)
+            duration = round(time.time() - start_time, 2)
+            exit_code = status.get("StatusCode", 1)
+            output = container.logs().decode("utf-8", errors="replace")
+            return self._parse_pytest_output(output, exit_code, duration)
+        finally:
+            try:
+                container.remove(force=True)
+            except Exception:
+                pass
+
+    def _run_in_subprocess(
+        self, target_dir: Path, test_target: Optional[str], timeout_val: int
+    ) -> TestExecutionResult:
+        """Subprocess sandbox execution with environment and timeout constraints."""
         cmd = [sys.executable, "-m", "pytest", "-v", "--tb=short", "-p", "no:cacheprovider"]
         if test_target:
             cmd.append(test_target)
 
         start_time = time.time()
         try:
-            # Set PYTHONPATH and disable bytecode writing to prevent stale pyc caching
             env = os.environ.copy()
             env["PYTHONDONTWRITEBYTECODE"] = "1"
             env["PYTHONPATH"] = str(target_dir) + os.pathsep + env.get("PYTHONPATH", "")
@@ -50,7 +130,6 @@ class SandboxTestRunner:
 
             duration = round(time.time() - start_time, 2)
             output = (process.stdout or "") + "\n" + (process.stderr or "")
-
             return self._parse_pytest_output(output, process.returncode, duration)
 
         except subprocess.TimeoutExpired as e:
@@ -96,7 +175,6 @@ class SandboxTestRunner:
         passed_count = 0
         failed_count = 0
 
-        # Match summary line: e.g. "== 2 passed in 0.12s ==" or "== 1 failed, 2 passed in 0.45s =="
         passed_match = re.search(r"(\d+)\s+passed", output)
         if passed_match:
             passed_count = int(passed_match.group(1))
@@ -110,15 +188,11 @@ class SandboxTestRunner:
             failed_count += int(error_match.group(1))
 
         failures: List[TestFailureDetail] = []
-
-        # Find individual failed tests: e.g. "FAILED test_file.py::test_name - AssertionError: ..."
-        # or "FAILED test_file.py::test_name"
         failed_lines = re.findall(r"FAILED\s+([^\s:]+::[^\s\-]+)(?:\s+-\s+(.+))?", output)
         for match in failed_lines:
             test_name = match[0]
             err_msg = match[1] if len(match) > 1 and match[1] else "Test failed assertion or raised error"
 
-            # Try to grab traceback snippet
             tb_snippet = ""
             tb_pattern = rf"_{2,}\s+{re.escape(test_name.split('::')[-1])}\s+_{2,}([\s\S]+?)(?=(?:_{2,}|FAILED|=+|$))"
             tb_match = re.search(tb_pattern, output)
