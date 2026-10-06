@@ -98,6 +98,8 @@ GitHub Issue / Feature Request
 - **Static Analysis**: Python `ast` + `inspect`
 - **Graph Computing**: NetworkX
 - **ML / Vector Search**: Scikit-Learn (`TfidfVectorizer`, Cosine Similarity) + NumPy
+- **LLM Engine**: LiteLLM (Google Gemini, OpenAI, Anthropic support)
+- **CLI & Visualization**: Rich + Click
 - **Version Control**: GitPython
 - **Testing & Sandbox**: Pytest + Subprocess Sandbox
 
@@ -107,6 +109,7 @@ GitHub Issue / Feature Request
 
 ```
 AI-Software-Engineering-Agent/
+├── cli.py                         # Interactive Rich Terminal UI for repository tasks
 ├── app/
 │   ├── main.py                    # FastAPI entrypoint, middleware & routing
 │   ├── config.py                  # Pydantic Settings & environment variables
@@ -114,14 +117,17 @@ AI-Software-Engineering-Agent/
 │   │   └── v1/
 │   │       ├── repos.py           # AST analysis, graph impact & semantic search
 │   │       ├── issues.py          # Issue planning & human approval gate
-│   │       ├── tasks.py           # Sandbox verification & self-repair loop
+│   │       ├── tasks.py           # Sandbox verification, self-repair & WebSocket stream
 │   │       └── review.py          # Code review audit & PR description generator
 │   ├── core/
 │   │   ├── ast_parser.py          # AST visitor & symbol/call extractor
 │   │   ├── code_graph.py          # NetworkX repository dependency graph
 │   │   ├── indexer.py             # Semantic AST code chunker & vector search
+│   │   ├── event_stream.py        # Real-time WebSocket event broadcaster
+│   │   ├── llm_client.py          # LiteLLM client with Gemini, OpenAI, Claude support
 │   │   └── git_manager.py         # Git branch isolation, diffs & commits
 │   ├── agents/
+│   │   ├── orchestrator.py        # Master autonomous execution engine
 │   │   ├── planner.py             # Issue -> ImplementationPlan agent
 │   │   ├── debugger.py            # Traceback reflection & self-repair agent
 │   │   └── reviewer.py            # Senior code review & security auditor
@@ -130,7 +136,7 @@ AI-Software-Engineering-Agent/
 │   │   └── sandbox_runner.py      # Subprocess pytest runner with timeouts
 │   └── models/
 │       └── schemas.py             # Pydantic data schemas
-├── tests/                         # 29 Comprehensive unit & integration tests
+├── tests/                         # 32 Comprehensive unit & integration tests
 ├── PROJECT.md                     # Deep architectural specification
 ├── pyproject.toml                 # Package dependencies and configuration
 └── .env.example                   # Environment configuration template
@@ -140,32 +146,44 @@ AI-Software-Engineering-Agent/
 
 ## ⚡ Quickstart Guide
 
-### 1. Clone the Repository
+### 1. Clone & Install
 ```bash
 git clone https://github.com/UndelaNandini/AI-Software-Engineering-Agent.git
 cd AI-Software-Engineering-Agent
-```
-
-### 2. Install Dependencies
-```bash
 python -m pip install -e .
-python -m pip install pytest numpy scikit-learn
+python -m pip install pytest numpy scikit-learn rich litellm
 ```
 
-### 3. Start the FastAPI Server
+### 2. Interactive Terminal CLI
+```bash
+# Analyze any codebase AST
+python cli.py analyze .
+
+# Trace caller/callee ripple impact for any symbol
+python cli.py impact . calculate_total
+
+# Generate an interactive plan from an issue
+python cli.py plan . --title "Add user authentication fallback" --desc "Verify bearer token"
+
+# Run autonomous agent on an issue
+python cli.py run . --title "Fix calculator addition"
+```
+
+### 3. Start the FastAPI Server & WebSocket Stream
 ```bash
 python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
-Open **[http://localhost:8000/docs](http://localhost:8000/docs)** to view the interactive Swagger API documentation.
+- Interactive Swagger docs: **[http://localhost:8000/docs](http://localhost:8000/docs)**
+- WebSocket real-time stream: `ws://localhost:8000/api/v1/tasks/{task_id}/stream`
 
-### 4. Run the Test Suite
+### 4. Run the 32-Test Suite
 ```bash
 python -m pytest -v
 ```
 
 ---
 
-## 📡 REST API Reference
+## 📡 REST & WebSocket API Reference
 
 | Method | Endpoint | Description |
 | :--- | :--- | :--- |
@@ -176,6 +194,9 @@ python -m pytest -v
 | `POST` | `/api/v1/issues/plan` | Generate a structured implementation plan from an issue |
 | `GET` | `/api/v1/issues/plans/{id}` | Retrieve generated implementation plan |
 | `PATCH`| `/api/v1/issues/plans/{id}` | **Human Gate**: Approve, reject, or modify plan steps |
+| `POST` | `/api/v1/tasks/run` | Launch full autonomous orchestrator run |
+| `WS`   | `/api/v1/tasks/{id}/stream` | **Real-time WebSocket** stream of agent thoughts, edits & test logs |
+| `GET`  | `/api/v1/tasks/{id}/events` | Inspect full JSON log of execution events |
 | `POST` | `/api/v1/tasks/verify` | Execute test suite in isolated sandbox with timeout limits |
 | `POST` | `/api/v1/tasks/repair` | Run iterative self-repair loop on failing code (max 3 tries) |
 | `POST` | `/api/v1/review/diff` | Audit git diff for security and performance anti-patterns |
@@ -185,3 +206,4 @@ python -m pytest -v
 
 ## 📄 License
 This project is licensed under the MIT License.
+
