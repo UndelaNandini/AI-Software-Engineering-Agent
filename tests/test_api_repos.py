@@ -16,10 +16,16 @@ def test_health_check():
 
 
 def test_root_endpoint():
-    response = client.get("/")
+    response = client.get("/", follow_redirects=False)
+    assert response.status_code == 307
+    assert response.headers["location"] == "/dashboard"
+
+
+def test_dashboard_endpoint():
+    response = client.get("/dashboard")
     assert response.status_code == 200
-    data = response.json()
-    assert "message" in data
+    assert "AI Software Engineering Agent Dashboard" in response.text
+
 
 
 def test_analyze_endpoint_valid_repo(tmp_path: Path):

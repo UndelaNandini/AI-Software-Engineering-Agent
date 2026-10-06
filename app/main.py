@@ -37,14 +37,23 @@ async def health_check():
     }
 
 
+from pathlib import Path
+from fastapi.responses import HTMLResponse, RedirectResponse
+
+@app.get("/dashboard", response_class=HTMLResponse, tags=["Dashboard"])
+async def dashboard():
+    """Interactive visual dashboard for monitoring and running the AI Software Engineering Agent."""
+    template_path = Path(__file__).resolve().parent / "templates" / "dashboard.html"
+    if template_path.is_file():
+        return template_path.read_text(encoding="utf-8")
+    return "<h1>Dashboard template not found.</h1>"
+
+
 @app.get("/", tags=["Root"])
 async def root():
-    """Root info endpoint."""
-    return {
-        "message": f"Welcome to {settings.PROJECT_NAME}",
-        "docs": "/docs",
-        "api_v1": settings.API_V1_PREFIX,
-    }
+    """Root info endpoint redirecting to dashboard."""
+    return RedirectResponse(url="/dashboard")
+
 
 
 if __name__ == "__main__":
