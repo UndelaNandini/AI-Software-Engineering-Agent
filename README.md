@@ -217,6 +217,8 @@ python -m pytest -v
 | `POST` | `/api/v1/tasks/repair` | Run iterative self-repair loop on failing code (max 3 tries) |
 | `POST` | `/api/v1/review/diff` | Audit git diff for security and performance anti-patterns |
 | `POST` | `/api/v1/review/pr` | Generate verified GitHub Pull Request Markdown description |
+| `POST` | `/api/v1/review/publish-pr` | **Live GitHub PR Publisher**: Creates remote PR directly via GitHub REST API |
+
 
 ---
 

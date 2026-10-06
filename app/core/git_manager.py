@@ -64,3 +64,14 @@ class GitManager:
             return repo.active_branch.name
         except Exception:
             return "detached"
+
+    @staticmethod
+    def push_branch(repo_path: Path, branch_name: str, remote_name: str = "origin") -> bool:
+        """Pushes branch to remote."""
+        repo = GitManager.get_or_init_repo(repo_path)
+        try:
+            repo.git.push(remote_name, branch_name, set_upstream=True)
+            return True
+        except Exception as e:
+            raise RuntimeError(f"Git push failed: {e}")
+

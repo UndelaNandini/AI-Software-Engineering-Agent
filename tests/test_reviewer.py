@@ -74,3 +74,19 @@ def test_api_pr_description_endpoint(tmp_path: Path):
     data = resp.json()
     assert "## 🚀 PR: Add input sanitization" in data["markdown_body"]
     assert "✅ Verified & Passing" in data["markdown_body"]
+
+
+def test_api_publish_pr_no_token():
+    payload = {
+        "owner": "test-owner",
+        "repo": "test-repo",
+        "head_branch": "agent/fix-1",
+        "base_branch": "main",
+        "title": "Fix: Automated Bug Repair",
+    }
+    resp = client.post("/api/v1/review/publish-pr", json=payload)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["success"] is False
+    assert "GitHub token not configured" in data["message"]
+
