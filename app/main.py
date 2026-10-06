@@ -39,10 +39,22 @@ async def health_check():
 
 from pathlib import Path
 from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
+
+# Mount React Vite static assets if dist exists
+react_dist = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+if (react_dist / "assets").is_dir():
+    app.mount("/assets", StaticFiles(directory=str(react_dist / "assets")), name="react-assets")
 
 @app.get("/dashboard", response_class=HTMLResponse, tags=["Dashboard"])
 async def dashboard():
     """Interactive visual dashboard for monitoring and running the AI Software Engineering Agent."""
+    # 1. Prefer compiled React Vite bundle
+    react_index = react_dist / "index.html"
+    if react_index.is_file():
+        return react_index.read_text(encoding="utf-8")
+
+    # 2. Fallback to standalone template
     template_path = Path(__file__).resolve().parent / "templates" / "dashboard.html"
     if template_path.is_file():
         return template_path.read_text(encoding="utf-8")
@@ -53,6 +65,7 @@ async def dashboard():
 async def root():
     """Root info endpoint redirecting to dashboard."""
     return RedirectResponse(url="/dashboard")
+
 
 
 
