@@ -191,12 +191,32 @@ python benchmarks/run_eval.py
 
 > **Scorecard**: 100% Tasks Resolved (4/4), 100% Security Pass Rate, 0.56s Avg Time per Task.
 
-### 5. Run the 33-Test Unit & Integration Suite
+### 5. Run as Model Context Protocol (MCP) Server
+Expose codebase intelligence, surgical editing, and self-repair directly to Cursor, Claude Desktop, or VS Code:
+```bash
+python app/mcp_server.py
+```
+
+**Claude Desktop / Cursor Configuration (`claude_desktop_config.json`):**
+```json
+{
+  "mcpServers": {
+    "swe-agent": {
+      "command": "python",
+      "args": ["-m", "app.mcp_server"],
+      "cwd": "C:/path/to/AI-Software-Engineering-Agent"
+    }
+  }
+}
+```
+
+### 6. Run the 37-Test Unit & Integration Suite
 ```bash
 python -m pytest -v
 ```
 
 ---
+
 
 
 ## 📡 REST & WebSocket API Reference
