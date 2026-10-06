@@ -242,6 +242,15 @@ python -m pytest -v
 
 ---
 
-## 📄 License
-This project is licensed under the MIT License.
+---
+
+## 📄 License & Intellectual Property
+
+**Copyright © 2026 Nandini Undela ([@UndelaNandini](https://github.com/UndelaNandini)). All Rights Reserved.**
+
+This repository and its codebase are the intellectual property of **Nandini Undela**. 
+- Code is publicly viewable for portfolio review, technical evaluation, and demonstration purposes.
+- Commercial reuse, redistribution, modification, replication, or re-hosting without prior written authorization is strictly prohibited.
+- See the [LICENSE](LICENSE) file for complete legal terms.
+
 
